@@ -33,7 +33,7 @@ bumble/snoop.py
 
 Overwrite the existing file.
 
-I'll open a PR for bumble ASAP so this step will become obsolete.
+I have opened a [PR](https://github.com/google/bumble/pull/865) for bumble so this step may become obsolete.
 
 ---
 
