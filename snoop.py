@@ -115,7 +115,7 @@ class PcapSnooper(Snooper):
     """
     Snooper that saves or streames HCI packets using the PCAP format.
     """
-    
+
     PCAP_MAGIC = 0xa1b2c3d4
     DLT_BLUETOOTH_HCI_H4_WITH_PHDR = 201
 
@@ -179,10 +179,39 @@ def create_snooper(spec: str) -> Generator[Snooper, None, None]:
             utcnow: the value of `datetime.now(tz=datetime.timezone.utc)`
             pid: the current process ID.
             instance: the instance ID in the current process.
+        
+      pcapsnoop
+        The syntax for the type-specific arguments for this type is:
+        <io-type>:<io-type-specific-arguments>
+
+        Supported I/O types are:
+
+        file
+          The type-specific arguments for this I/O type is a string that is converted
+          to a file path using the python `str.format()` string formatting. The log
+          records will be written to that file if it can be opened/created.
+          The keyword args that may be referenced by the string pattern are:
+            now: the value of `datetime.now()`
+            utcnow: the value of `datetime.now(tz=datetime.timezone.utc)`
+            pid: the current process ID.
+            instance: the instance ID in the current process.
+        
+        pipe
+          The type-specific arguments for this I/O type is a string that is converted
+          to a path using the python `str.format()` string formatting. The log
+          records will be written to the named pipe referenced by this path 
+          if it can be opened. The keyword args that may be referenced by the
+          string pattern are:
+            now: the value of `datetime.now()`
+            utcnow: the value of `datetime.now(tz=datetime.timezone.utc)`
+            pid: the current process ID.
+            instance: the instance ID in the current process.
 
     Examples:
       btsnoop:file:my_btsnoop.log
       btsnoop:file:/tmp/bumble_{now:%Y-%m-%d-%H:%M:%S}_{pid}.log
+      pcapsnoop:pipe:/tmp/bumble-extcap
+
 
     """
     if ':' not in spec:
@@ -215,10 +244,12 @@ def create_snooper(spec: str) -> Generator[Snooper, None, None]:
 
     elif snooper_type == 'pcapsnoop':
         if ':' not in snooper_args:
-            raise core.InvalidArgumentError('I/O type for pcapsnoop snooper type missing')
+            raise core.InvalidArgumentError(
+                'I/O type for pcapsnoop snooper type missing'
+            )
 
         io_type, io_name = snooper_args.split(':', maxsplit=1)
-        if io_type == 'pipe' or io_type == 'file':
+        if io_type in {'pipe', 'file'}:
             # Process the file name string pattern.
             file_path = io_name.format(
                 now=datetime.datetime.now(),
