@@ -118,12 +118,14 @@ class PcapSnooper(Snooper):
     def __init__(self, fifo):
         self.output = fifo
 
+        # Write the header
         self.output.write(struct.pack("<IHHIIII",
             PCAP_MAGIC,
-            2, 4,
-            0, 0,
-            65535,
-            DLT_BLUETOOTH_HCI_H4_WITH_PHDR
+            2, 4, # Major and Minor PCAP Version
+            0, 0, # Reserved 1 and 2
+            65535, # SnapLen
+            # FCS and f are set to 0 implicitly by the next line
+            DLT_BLUETOOTH_HCI_H4_WITH_PHDR # The DLT in this PCAP
         ))
 
     def snoop(self, hci_packet: bytes, direction: Snooper.Direction):
@@ -131,17 +133,22 @@ class PcapSnooper(Snooper):
         sec = int(now.timestamp())
         usec = now.microsecond
 
-        self.output.write(struct.pack("<IIII",
-            sec, usec,
-            len(hci_packet)+4, # +4 because of the addtional direction info...
-            len(hci_packet)+4
-        ))
-        self.output.write(struct.pack(">I", int(direction))) # ...thats being added here
-        self.output.write(hci_packet) # this includes the hci packet type in the first byte
-        self.output.flush()
+        # Emit the record
+        self.output.write(
+            struct.pack("<IIII",
+                sec, # Timestamp (Seconds)
+                usec, # Timestamp (Microseconds)
+                len(hci_packet)+4,
+                len(hci_packet)+4 # +4 because of the addtional direction info...
+            )
+            + struct.pack(">I", int(direction)) # ...thats being added here
+            + hci_packet
+        )
+        self.output.flush() # flush after every packet for live logging
 
 # -----------------------------------------------------------------------------
 _SNOOPER_INSTANCE_COUNT = 0
+
 
 @contextmanager
 def create_snooper(spec: str) -> Generator[Snooper, None, None]:
@@ -179,7 +186,6 @@ def create_snooper(spec: str) -> Generator[Snooper, None, None]:
 
     snooper_type, snooper_args = spec.split(':', maxsplit=1)
 
-    global _SNOOPER_INSTANCE_COUNT
     if snooper_type == 'btsnoop':
         if ':' not in snooper_args:
             raise core.InvalidArgumentError('I/O type for btsnoop snooper type missing')
@@ -187,6 +193,7 @@ def create_snooper(spec: str) -> Generator[Snooper, None, None]:
         io_type, io_name = snooper_args.split(':', maxsplit=1)
         if io_type == 'file':
             # Process the file name string pattern.
+            global _SNOOPER_INSTANCE_COUNT
             file_path = io_name.format(
                 now=datetime.datetime.now(),
                 utcnow=datetime.datetime.now(tz=datetime.timezone.utc),
@@ -204,10 +211,10 @@ def create_snooper(spec: str) -> Generator[Snooper, None, None]:
 
     elif snooper_type == 'pcapsnoop':
         if ':' not in snooper_args:
-            raise core.InvalidArgumentError('I/O type for btsnoop snooper type missing')
+            raise core.InvalidArgumentError('I/O type for pcapsnoop snooper type missing')
 
         io_type, io_name = snooper_args.split(':', maxsplit=1)
-        if io_type == 'pipe':
+        if io_type == 'pipe' or io_type == 'file':
             # Process the file name string pattern.
             file_path = io_name.format(
                 now=datetime.datetime.now(),
@@ -216,9 +223,15 @@ def create_snooper(spec: str) -> Generator[Snooper, None, None]:
                 instance=_SNOOPER_INSTANCE_COUNT,
             )
 
-            # Open the file
-            logger.error(f'Snoop file: {file_path}')
-            with open(file_path, 'wb', buffering=0) as snoop_file:
+            # Pipes we have to open with unbuffered binary I/O
+            kwargs = {}
+            if io_type == 'pipe':
+                kwargs["buffering"] = 0
+
+            # Open a file or pipe
+            logger.debug(f'PCAP file: {file_path}')
+            # Pass ``buffering`` for pipes but not for files
+            with open(file_path, 'wb', **kwargs) as snoop_file:
                 _SNOOPER_INSTANCE_COUNT += 1
                 yield PcapSnooper(snoop_file)
                 _SNOOPER_INSTANCE_COUNT -= 1
