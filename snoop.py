@@ -111,21 +111,25 @@ class BtSnooper(Snooper):
 
 
 # -----------------------------------------------------------------------------
-PCAP_MAGIC = 0xa1b2c3d4
-DLT_BLUETOOTH_HCI_H4_WITH_PHDR = 201
-
 class PcapSnooper(Snooper):
+    """
+    Snooper that saves or streames HCI packets using the PCAP format.
+    """
+    
+    PCAP_MAGIC = 0xa1b2c3d4
+    DLT_BLUETOOTH_HCI_H4_WITH_PHDR = 201
+
     def __init__(self, fifo):
         self.output = fifo
 
         # Write the header
         self.output.write(struct.pack("<IHHIIII",
-            PCAP_MAGIC,
+            self.PCAP_MAGIC,
             2, 4, # Major and Minor PCAP Version
             0, 0, # Reserved 1 and 2
             65535, # SnapLen
             # FCS and f are set to 0 implicitly by the next line
-            DLT_BLUETOOTH_HCI_H4_WITH_PHDR # The DLT in this PCAP
+            self.DLT_BLUETOOTH_HCI_H4_WITH_PHDR # The DLT in this PCAP
         ))
 
     def snoop(self, hci_packet: bytes, direction: Snooper.Direction):
