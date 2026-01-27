@@ -33,7 +33,9 @@ bumble/snoop.py
 
 Overwrite the existing file.
 
-I have opened a [PR](https://github.com/google/bumble/pull/865) for bumble so this step may become obsolete.
+
+> [!IMPORTANT]  
+> My [PR](https://github.com/google/bumble/pull/865) for Bumble was accepted, so manual **patching is not needed for Bumble v0.0.224 and above**.
 
 ---
 
